@@ -1,0 +1,20 @@
+#!/bin/bash
+
+RCONF=${RCONF:-/usr/libexec/rconf}
+OPT=${OPT:-/opt}
+
+. $RCONF/librconf.sh
+
+selections_basename rconf 2
+create_dialog_file
+populate_dialog_file_desc
+
+while true; do
+    rc=$(dialog --stdout --backtitle "$ROUTER configuration" --title "Main menu" --ok-label Select --cancel-label Cancel --menu "Choose section" 0 0 0 --file $F "Remount rootfs writable" -)
+
+    [ $? = 0 ] || exit 0
+    
+    [ "$rc" = "Remount rootfs writable" ] && remount w && continue
+    
+    run_if_script "$rc" --menu
+done

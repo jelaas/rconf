@@ -1,0 +1,20 @@
+#!/bin/bash
+
+[ "$1" = --description ] && echo "Global protocol settings" && exit 0
+
+RCONF=${RCONF:-/usr/libexec/rconf}
+OPT=${OPT:-/opt}
+
+. $RCONF/librconf.sh
+
+selections_basename rconf-proto-global 4
+create_dialog_file
+populate_dialog_file_value
+
+while true; do
+    rc=$(dialog --stdout --backtitle "$ROUTER configuration" --title "Configure global protocol settings" --ok-label Select --cancel-label Cancel --menu  "Choose protocol" 0 0 0 --file $F)
+
+    [ $? = 0 ] || exit 0
+    
+    run_if_script "$rc"
+done

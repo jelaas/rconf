@@ -1,0 +1,3 @@
+#!/bin/bash
+
+[ "$1" = --description ] && echo "Global ipv6 options" && exit 0

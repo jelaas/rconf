@@ -1,0 +1,6 @@
+#!/bin/bash
+
+[ "$1" = --description ] && echo "IPv6" && exit 0
+
+[ "$1" = --linkinfo ] && echo "::1" && exit 0
+

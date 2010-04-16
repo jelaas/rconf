@@ -1,0 +1,51 @@
+#!/bin/bash
+
+[ "$1" = --description ] && echo "Protocol per interface settings" && exit 0
+
+RCONF=${RCONF:-/usr/libexec/rconf}
+OPT=${OPT:-/opt}
+ETC=${ETC:-/etc}
+
+. $RCONF/librconf.sh
+
+function confniclist {
+    for f in $ETC/config.flags/*.nic; do
+	[ ! -f "$f" ] && continue
+	f=${f##*/}
+	    . $ETC/config.data/$f
+	    echo ${f/.nic/}
+    done
+}
+
+function ifconf {
+    local ifname=$1
+
+    while true; do
+	selections_linkinfo $ifname rconf-proto-interface 4
+	create_dialog_file
+	populate_dialog_file_value
+	
+	rc=$(dialog --stdout --backtitle "$ROUTER configuration" --title "Configure protocols" --ok-label Select --cancel-label Cancel --menu  "Choose protocol" 0 0 0 --file $F)
+	
+	[ $? = 0 ] || return 0
+	
+	run_if_script "$rc" --interface $ifname
+    done
+}
+
+while true; do
+    nics="$((ifinfo;confniclist)|sort|uniq)"
+
+    create_dialog_file
+
+    for nic in $nics; do
+        echo \"$nic\" \"$(ifinfo -w -s - -i $nic driver)$(ifinfo -w -s Mbit- -i $nic speedmax)$(ifinfo -w -i $nic bus_info)\" >> $F
+    done
+    
+    rc=$(dialog --stdout --backtitle "$ROUTER configuration" --title "Configure traffic control for interfaces" --ok-label Select --cancel-label Cancel --menu  "Choose interface" 0 0 0 --file $F)
+    
+    [ $? = 0 ] || exit 0
+    
+    ifconf $rc
+done
+

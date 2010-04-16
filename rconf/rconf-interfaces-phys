@@ -1,0 +1,98 @@
+#!/bin/bash
+
+[ "$1" = --description ] && echo "Physical" && exit 0
+
+PATH=$PATH:/sbin/:/usr/sbin
+
+RCONF=${RCONF:-/usr/libexec/rconf}
+ETC=${ETC:-/etc}
+
+. $RCONF/librconf.sh
+
+function confniclist {
+    for f in $ETC/config.flags/*.nic; do
+	[ ! -f "$f" ] && continue
+	f=${f##*/}
+	    . $ETC/config.data/$f
+	    [ "$IFCLASS" = phys ] && echo ${f/.nic/}
+    done
+}
+
+function selecttype {
+    local types item phys
+    
+    for v in $(selections rconf-interfaces-virtual 4); do
+	item=$($v --physhost)
+	if [ $? = 0 ]; then
+	    types="$types $item $item"
+	    if [ $item = $1 ]; then
+		types="$types on"
+	    else
+		types="$types off"
+	    fi
+	fi
+    done
+
+    phys=off
+    [ "$1" = phys ] && phys=on
+
+    rc=$(dialog --stdout --radiolist "Select type" 0 0 0 phys phys $phys $types)
+    [ $? = 0 ] || return 1
+    echo $rc
+}
+
+function ifphys {
+    local ifname=$1
+    [ -f $ETC/config.data/${ifname}.nic ] && . $ETC/config.data/${ifname}.nic
+    [ "$PERSISTENT" = yes ] || PERSISTENT=no
+    IFTYPE=${IFTYPE:-phys}
+    [ "$DESCRIPTION" ] || DESCRIPTION="$ifname"
+
+    item="Import running config"
+    
+    while true; do
+	selections_linkinfo $ifname rconf-proto-interface 4 rconf-control-interface 4
+	create_dialog_file
+	populate_dialog_file_value
+
+	rc=$(dialog --stdout --backtitle "$ROUTER configuration" --title "Configure physical interface $ifname" --ok-label Select --cancel-label Cancel --default-item "$item" --menu  "Choose" 0 0 0 Description "$DESCRIPTION" Persistent "$PERSISTENT" Type "$IFTYPE" --file $F "Import running config" . Save  "")
+	
+	[ $? = 0 ] || return 0
+
+	item="$rc"
+
+	run_if_script "$rc" --interface $ifname
+
+	if [ "$rc" = Type ]; then
+	    IFTYPE=$(selecttype "$IFTYPE")
+	    continue
+	fi
+
+	if [ "$rc" = Persistent ]; then
+	    [ "$PERSISTENT" = no ] && PERSISTENT=yes && continue
+	    PERSISTENT=no
+	fi
+
+	if [ "$rc" = Save ]; then
+	    configapply $ETC/config.data/${ifname}.nic PERSISTENT "$PERSISTENT" IFTYPE "$IFTYPE" DESCRIPTION "$DESCRIPTION"
+	fi
+    done
+}
+
+
+
+while true; do
+    nics="$((ifinfo;confniclist)|sort|uniq)"
+
+    create_dialog_file
+    
+    for nic in $nics; do
+	echo \"$nic\" \"$(ifinfo -w -s - -i $nic driver)$(ifinfo -w -s Mbit- -i $nic speedmax)$(ifinfo -w -i $nic bus_info)\" >> $F
+    done
+	
+    rc=$(dialog --stdout --backtitle "$ROUTER configuration" --title "Configure interfaces" --ok-label Select --cancel-label Cancel --menu  "Choose interface" 0 0 0 --file $F)
+
+    [ $? = 0 ] || exit 0
+    
+    ifphys $rc
+done

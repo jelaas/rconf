@@ -1,0 +1,11 @@
+#!/bin/bash
+
+[ "$1" = --description ] && echo "Hostname" && exit 0
+
+ETC=${ETC:-/etc}
+
+read hostname < $ETC/HOSTNAME
+
+rc=$(dialog --stdout --inputbox "Enter hostname" 0 0 "$hostname") 
+[ $? = 0 ] || return 0
+echo $rc > $ETC/HOSTNAME

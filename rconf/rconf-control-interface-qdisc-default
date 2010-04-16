@@ -1,0 +1,6 @@
+#!/bin/bash
+
+[ "$1" = --description ] && echo "default" && exit 0
+
+[ "$1" = --linkinfo ] && echo "default" && exit 0
+

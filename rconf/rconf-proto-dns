@@ -1,0 +1,54 @@
+#!/bin/bash
+
+[ "$1" = --description ] && echo "DNS" && exit 0
+
+ETC=${ETC:-/etc}
+
+function dnsserver {
+    rc=$(dialog --stdout --inputbox "Enter dnsserver IP" 0 0 "$1") 
+    [ $? = 0 ] || return 1
+    echo $rc
+    return 0
+}
+
+s[0]="none"
+s[1]="none"
+s[2]="none"
+i=0
+exec 3<$ETC/resolv.conf
+while read -u 3 L; do
+    if echo $L|grep -qs "^nameserver" ; then
+	s[$i]=$(echo $L|cut -d ' ' -f 2)
+	i=$[ i+1 ]
+    fi
+done
+
+while true; do
+    rc=$(dialog --stdout --backtitle "$ROUTER configuration" --title "Configure DNS" --ok-label Select --cancel-label Back --menu  "Choose" 0 0 0 Server1 "${s[0]}" Server2 "${s[1]}" Server3 "${s[2]}" Save "")
+    [ $? = 0 ] || exit 0
+
+    case $rc in
+	'Save')
+	grep -v "^nameserver" $ETC/resolv.conf > /tmp/dnsconf.$$
+	if [ -f /tmp/dnsconf.$$ ] ; then
+	    cat /tmp/dnsconf.$$ > $ETC/resolv.conf
+	    [ "${s[0]}" = none ] || (echo "nameserver ${s[0]}" >> $ETC/resolv.conf)
+	    [ "${s[1]}" = none ] || (echo "nameserver ${s[1]}" >> $ETC/resolv.conf)
+	    [ "${s[2]}" = none ] || (echo "nameserver ${s[2]}" >> $ETC/resolv.conf)
+	    rm -f /tmp/dnsconf.$$
+	fi
+	;;
+	Server1)
+	rc=$(dnsserver "${s[0]}")
+	[ $? = 0 ] && s[0]=$rc
+	;;
+	Server2)
+	rc=$(dnsserver "${s[1]}")
+	[ $? = 0 ] && s[1]=$rc
+	;;
+	Server3)
+	rc=$(dnsserver "${s[2]}")
+	[ $? = 0 ] && s[2]=$rc
+	;;
+	esac	
+done

@@ -1,0 +1,21 @@
+#!/bin/bash
+
+[ "$1" = --description ] && echo "Services" && exit 0
+
+RCONF=${RCONF:-/usr/libexec/rconf}
+OPT=${OPT:-/opt}
+
+. $RCONF/librconf.sh
+
+selections_basename rconf-services 3
+create_dialog_file
+populate_dialog_file_desc
+
+while true; do
+    rc=$(dialog --stdout --backtitle "$ROUTER configuration" --title "Configure services" --ok-label Select --cancel-label Cancel --menu  "Choose type of services" 0 0 0 --file $F)
+
+    [ $? = 0 ] || exit 0
+
+    run_if_script "$rc"
+done
+

@@ -1,0 +1,67 @@
+#!/bin/bash
+
+[ "$1" = --description ] && echo "QDisc" && exit 0
+
+[ "$1" = --linkinfo ] && echo "default" && exit 0
+
+PATH=$PATH:/sbin/:/usr/sbin
+RCONF=${RCONF:-/usr/libexec/rconf}
+OPT=${OPT:-/opt}
+ETC=${ETC:-/etc}
+
+. $RCONF/librconf.sh
+
+ifname=""
+
+[ "$1" = --interface ] && ifname=$2
+
+function select_qdisc {
+    local qdiscs rc q
+    
+    for f in $(selections rconf-control-interface-qdisc 5); do 
+	q="$($f --description)"
+	qdiscs="$qdiscs $q ."
+	if [ $q = $1 ]; then
+	    qdiscs="$qdiscs on"
+	else
+	    qdiscs="$qdiscs off"
+	fi
+    done
+
+    rc=$(dialog --stdout --radiolist "Select qdisc" 0 0 0 $qdiscs)
+    if [ $? != 0 ]; then
+	echo $1
+	return 1
+    fi
+    echo $rc
+}
+
+function ifconf {
+    local ifname=$1
+
+    [ -f $ETC/config.data/${ifname}.nic ] && . $ETC/config.data/${ifname}.nic
+    [ "$QDISC" ] || QDISC=default
+
+    while true; do
+	selections_linkinfo $ifname rconf-control-interface-qdisc 5
+	create_dialog_file
+        populate_dialog_file_value
+
+	rc=$(dialog --stdout --backtitle "$ROUTER configuration" --title "Configure QDisc for $ifname" --ok-label Select --cancel-label Cancel --menu  "Choose" 0 0 0 QDisc "$QDISC" --file $F Save "")
+	[ $? = 0 ] || return 0
+	
+	run_if_script "$rc" --interface $ifname
+	
+	if [ "$rc" = QDisc ]; then
+	    QDISC="$(select_qdisc $QDISC)"
+	    continue
+	fi
+    done
+}
+
+
+if [ "$ifname" ]; then
+    ifconf $ifname
+    exit 0
+fi
+

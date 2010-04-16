@@ -1,0 +1,3 @@
+#!/bin/bash
+
+[ "$1" = --description ] && echo "bridge" && exit 0

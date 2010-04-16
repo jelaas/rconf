@@ -1,0 +1,50 @@
+#!/bin/bash
+
+[ "$1" = --description ] && echo "Core" && exit 0
+
+ETC=${ETC:-/etc}
+
+function config_apply {
+    onlist=":"
+    while read tag; do
+        onlist="$onlist$tag:"
+    done
+
+    for tag in $1; do
+	if echo $onlist|grep -q :$tag:; then
+	        toggle=yes
+		else
+	        toggle=no
+		fi
+	pkg=${tag%%/*}
+	srv=${tag##*/}
+	    
+	echo $toggle > $ETC/config.flags/$srv
+    done
+ }
+	
+	for f in $ETC/config.flags/*; do
+	    if [ -f "$f" ]; then
+	        # not *.mod and *.nic
+	        [ "${f##*.}" = nic ] && continue
+		[ "${f##*.}" = mod ] && continue
+		
+		tag="Core/$(basename $f)"
+		item="$tag"
+		status="$(cat $f)"
+		if [ "$status" = yes ]; then
+		    status=on
+		else
+		    status=off
+		fi
+		s="$s $tag - $status"
+		services="$services$tag "
+	    fi
+	done
+
+	rc=$(dialog --stdout --ok-label Apply --separate-output --backtitle "$ROUTER configuration" --title "Configure services" --checklist "Core services" 0 0 0 $s)
+	[ $? = 0 ] || return
+
+	config_apply "$services" <<EOF
+$rc
+EOF

@@ -1,0 +1,20 @@
+#!/bin/bash
+
+[ "$1" = --description ] && echo "Traffic control" && exit 0
+
+RCONF=${RCONF:-/usr/libexec/rconf}
+OPT=${OPT:-/opt}
+
+. $RCONF/librconf.sh
+
+selections_basename rconf-control 3
+create_dialog_file
+populate_dialog_file_desc
+
+while true; do
+    rc=$(dialog --stdout --backtitle "$ROUTER configuration" --title "Configure traffic control" --ok-label Select --cancel-label Cancel --menu  "Choose type" 0 0 0 --file $F)
+    
+    [ $? = 0 ] || exit 0
+    
+    run_if_script "$rc"
+done

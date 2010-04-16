@@ -1,0 +1,20 @@
+#!/bin/bash
+
+[ "$1" = --description ] && echo "Protocols" && exit 0
+
+RCONF=${RCONF:-/usr/libexec/rconf}
+OPT=${OPT:-/opt}
+
+. $RCONF/librconf.sh
+
+selections_basename rconf-proto 3
+create_dialog_file
+populate_dialog_file_desc
+
+while true; do
+    rc=$(dialog --stdout --backtitle "$ROUTER configuration" --title "Configure protocols" --ok-label Select --cancel-label Cancel --menu  "Choose protocol" 0 0 0 --file $F)
+
+    [ $? = 0 ] || exit 0
+    
+    run_if_script "$rc"
+done

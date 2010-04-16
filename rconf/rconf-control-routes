@@ -1,0 +1,8 @@
+#!/bin/bash
+
+[ "$1" = --description ] && echo "Static routes" && exit 0
+
+RCONF=${RCONF:-/usr/libexec/rconf}
+OPT=${OPT:-/opt}
+
+. $RCONF/librconf.sh

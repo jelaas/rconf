@@ -1,0 +1,29 @@
+#!/bin/bash
+
+[ "$1" = --description ] && echo "Kernel drivers" && exit 0
+
+ETC=${ETC:-/etc}
+. $RCONF/librconf.sh
+
+DRIVERS="igb nui e1000 e1000e tulip ixgbe"
+
+for f in $DRIVERS; do
+    if [ -f "$ETC/config.flags/$f.mod" ]; then
+	read status < $ETC/config.flags/$f
+	if [ "$status" = yes ]; then
+	    status=on
+	else
+	    status=off
+	fi
+	s="$f - $status"
+	list="$list$s "
+    fi
+done
+
+rc=$(dialog --stdout --ok-label Apply --separate-output --backtitle "$ROUTER configuration" --title "Configure drivers" --checklist "Driver modules" 0 0 0 $s)
+
+[ $? = 0 ] || return
+
+config_apply "$services" <<EOF
+$rc
+EOF

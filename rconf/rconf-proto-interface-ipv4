@@ -1,0 +1,120 @@
+#!/bin/bash
+
+function linkinfo {
+    local addr
+    local ifname
+
+    ifname="$1"
+    IP4ADDR=""
+    [ -f $ETC/config.data/${ifname}.nic ] && . $ETC/config.data/${ifname}.nic
+    
+    for addr in $(echo $IP4ADDR|tr ',' ' ') EOF; do
+	[ "$addr" = EOF ] && break
+	echo $addr
+	return 
+    done
+    echo "-"
+}
+
+[ "$1" = --description ] && echo "IPv4" && exit 0
+[ "$1" = --linkinfo ] && linkinfo "$2" && exit 0
+
+PATH=$PATH:/sbin/:/usr/sbin
+ETC=${ETC:-/etc}
+RCONF=${RCONF:-/usr/libexec/rconf}
+OPT=${OPT:-/opt}
+
+. $RCONF/librconf.sh
+
+ifname=""
+
+[ "$1" = --interface ] && ifname=$2
+
+function splitiplist {
+    local list i addr
+    list=""
+    i=1
+    for addr in $(echo $1|tr ',' ' ') EOF; do
+	[ "$addr" = EOF ] && break
+	list="$list IP-$addr -"
+	i=$[ i+1 ]
+    done
+    echo $list
+}
+
+function cleaniplist {
+    local list i addr
+    list=""
+    i=1
+    for addr in $(echo $1|tr ',' ' ') EOF; do
+	[ "$addr" = EOF ] && break
+	[ "$i" = 1 ] || list="$list,"
+	list="$list$addr"
+	i=$[ i+1 ]
+    done
+    echo $list
+}
+
+function addip {
+    local ip pfx
+    ip=$(dialog --stdout --inputbox "IPv4 address" 0 0 "")
+    [ $? = 0 ] || return 1
+    pfx=$(dialog --stdout --inputbox "Prefix length" 0 0 "24")
+    [ $? = 0 ] || return 1
+    echo $ip/$pfx
+    return 0
+}
+
+
+function ifconf {
+    local ifname=$1
+
+    IP4ADDR=""
+    [ -f $ETC/config.data/${ifname}.nic ] && . $ETC/config.data/${ifname}.nic
+    [ "$DHCP" = yes ] || DHCP=no
+    
+    [ "$CONFIG_NO_SPOOF" ] || CONFIG_NO_SPOOF=yes
+    [ "$CONFIG_NO_SOURCE" ] || CONFIG_NO_SOURCE=yes
+    [ "$CONFIG_PROXY_ARP" ] || CONFIG_PROXY_ARP=no
+    [ "$CONFIG_REDIRECT" ] || CONFIG_REDIRECT=yes
+    [ "$CONFIG_ACCEPT_REDIRECT" ] || CONFIG_ACCEPT_REDIRECT=no
+    [ "$CONFIG_LOG_MARTIANS" ] || CONFIG_LOG_MARTIANS=yes
+
+    while true; do
+	iplist=$(splitiplist "$IP4ADDR")
+
+	rc=$(dialog --stdout --backtitle "$ROUTER configuration" --title "Configure IPv4 for $ifname" --ok-label Select --cancel-label Cancel --default-item "$item" --menu  "Choose" 0 0 0 DHCP "$DHCP" $iplist "Add IPv4 address" "" no_spoof "$CONFIG_NO_SPOOF" no_source "$CONFIG_NO_SOURCE" proxy_arp "$CONFIG_PROXY_ARP" redirect "$CONFIG_REDIRECT" accept_redirect "$CONFIG_ACCEPT_REDIRECT" log_martians "$CONFIG_LOG_MARTIANS" Save  "")
+	[ $? = 0 ] || return 0
+	if [ "$rc" = DHCP ]; then
+	    [ "$DHCP" = no ] && DHCP=yes && continue
+	    DHCP=no
+	fi
+
+	if [ "$rc" = "Add IPv4 address" ]; then
+	    ip=$(addip $ifname)
+	    [ "$ip" ] && IP4ADDR=$IP4ADDR,$ip
+	    continue
+	fi
+	if [ "${rc:0:3}" = "IP-" ]; then
+	    if dialog --yesno "Delete address ${rc:3}?" 0 0; then
+		IP4ADDR=$(cleaniplist ${IP4ADDR/${rc:3}/})
+	    fi
+	    continue
+	fi
+	if [ "$rc" = Save ]; then
+	    IP4ADDR=$(cleaniplist $IP4ADDR)
+	    configapply $ETC/config.data/${ifname}.nic IP4ADDR "$IP4ADDR" BROADCAST 255.255.255.255 DHCP "$DHCP" CONFIG_NO_SPOOF "$CONFIG_NO_SPOOF" CONFIG_NO_SOURCE "$CONFIG_NO_SOURCE" CONFIG_PROXY_ARP "$CONFIG_PROXY_ARP" CONFIG_REDIRECT "$CONFIG_REDIRECT" CONFIG_ACCEPT_REDIRECT "$CONFIG_ACCEPT_REDIRECT" CONFIG_LOG_MARTIANS "$CONFIG_LOG_MARTIANS"
+	fi
+    done
+}
+
+if [ "$ifname" ]; then
+    ifconf $ifname
+    exit 0
+fi
+
+# menu here: select an interface to configure
+
+
+[ -z "$ifname" ] && exit 0
+

@@ -1,0 +1,58 @@
+#!/bin/bash
+
+[ "$1" = --description ] && echo "VLAN" && exit 0
+[ "$1" = --physhost ] && echo "vlan-host" && exit 0
+
+PATH=$PATH:/sbin/:/usr/sbin
+RCONF=${RCONF:-/usr/libexec/rconf}
+ETC=${ETC:-/etc}
+
+. $RCONF/librconf.sh
+
+function confniclist {
+    for f in $ETC/config.flags/*.nic; do
+	[ ! -f "$f" ] && continue
+	f=${f##*/}
+	    . $ETC/config.data/$f
+	    [ "$IFTYPE" = vlan ] && echo ${f/.nic/}:$PHYSHOST/$VLANID
+    done
+}
+
+function ifconf {
+    local ifname=$1
+    [ -f $ETC/config.data/${ifname}.nic ] && . $ETC/config.data/${ifname}.nic
+    IFTYPE=${IFTYPE:-vlan}
+    [ "$DESCRIPTION" ] || DESCRIPTION="$ifname"
+    
+    item="Import running config"
+    
+    while true; do
+	selections_linkinfo $ifname rconf-proto-interface 4 rconf-control-interface 4
+        create_dialog_file
+        populate_dialog_file_value
+
+	rc=$(dialog --stdout --backtitle "$ROUTER configuration" --title "Configure virtual interface $ifname" --ok-label Select --cancel-label Cancel --default-item "$item" --menu  "Choose" 0 0 0 Type "$IFTYPE" --file $F Save  "")
+	
+	[ $? = 0 ] || return 0
+
+	item="$rc"
+
+	run_if_script "$rc" --interface $ifname
+    done
+}
+
+
+while true; do
+    nics="$(confniclist|sort|uniq)"
+    
+    niclist=""
+    for nic in $nics; do
+	niclist="$niclist $(echo $nic|tr ':' ' ')"
+    done
+    
+    rc=$(dialog --stdout --backtitle "$ROUTER configuration" --title "Configure virtual interfaces" --ok-label Select --cancel-label Cancel --menu  "Choose interface" 0 0 0 $niclist "Create new VLAN interface" "")
+
+    [ $? = 0 ] || exit 0
+    
+    ifconf $rc
+done

@@ -1,0 +1,51 @@
+#!/bin/bash
+
+[ "$1" = --description ] && echo "Optional" && exit 0
+
+ETC=${ETC:-/etc}
+OPT=${OPT:-/opt}
+
+function config_apply {
+    onlist=":"
+    while read tag; do
+        onlist="$onlist$tag:"
+    done
+
+    for tag in $1; do
+	if echo $onlist|grep -q :$tag:; then
+	    toggle=yes
+	else
+	    toggle=no
+	fi
+	pkg=${tag%%/*}
+	srv=${tag##*/}
+	    
+	    echo $toggle > $OPT/$pkg/etc/config.flags/$srv
+    done
+}
+
+for pkg in $OPT/*; do
+    [ -d $pkg ] || continue
+    
+    for f in $pkg/etc/config.flags/*; do
+	if [ -f "$f" ]; then
+	    tag="$(basename $pkg)/$(basename $f)"
+	    item="$tag"
+	    status="$(cat $f)"
+	    if [ "$status" = yes ]; then
+		status=on
+	    else
+		status=off
+	    fi
+	    s="$s $tag - $status"
+	    services="$services$tag "
+	fi
+    done
+done
+
+rc=$(dialog --stdout --ok-label Apply --separate-output --backtitle "$ROUTER configuration" --title "Configure services" --checklist "Optional services" 0 0 0 $s)
+[ $? = 0 ] || return
+
+config_apply "$services" <<EOF
+$rc
+EOF
