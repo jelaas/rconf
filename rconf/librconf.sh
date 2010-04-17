@@ -4,7 +4,7 @@ ROUTER="Bifrost"
 function selections {
     local f n
     
-    for f in $(find $RCONF $OPT -name $1'-*[^~]'); do
+    for f in $(find $RCONF $OPT -maxdepth 4 -name $1'-*[^~]'); do
 	n=$(basename $f|cut -d '-' -f 1-$2)
 	echo $(dirname $f)/$n
     done | sort |uniq
