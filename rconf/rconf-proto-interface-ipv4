@@ -68,7 +68,7 @@ function addip {
 # toggle selecteditem menuitem configvalue
 function toggle {
 	if [ "$1" = $2 ]; then
-	    [ "$3" = no ] && echo yes
+	    [ "$3" = no ] && echo yes && return
 	    echo no
 	    return
 	fi
