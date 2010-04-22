@@ -65,6 +65,15 @@ function addip {
     return 0
 }
 
+# toggle selecteditem menuitem configvalue
+function toggle {
+	if [ "$1" = $2 ]; then
+	    [ "$3" = no ] && echo yes
+	    echo no
+	    return
+	fi
+	echo $3
+}
 
 function ifconf {
     local ifname=$1
@@ -85,10 +94,18 @@ function ifconf {
 
 	rc=$(dialog --stdout --backtitle "$ROUTER configuration" --title "Configure IPv4 for $ifname" --ok-label Select --cancel-label Cancel --default-item "$item" --menu  "Choose" 0 0 0 DHCP "$DHCP" $iplist "Add IPv4 address" "" no_spoof "$CONFIG_NO_SPOOF" no_source "$CONFIG_NO_SOURCE" proxy_arp "$CONFIG_PROXY_ARP" redirect "$CONFIG_REDIRECT" accept_redirect "$CONFIG_ACCEPT_REDIRECT" log_martians "$CONFIG_LOG_MARTIANS" Save  "")
 	[ $? = 0 ] || return 0
+	
 	if [ "$rc" = DHCP ]; then
 	    [ "$DHCP" = no ] && DHCP=yes && continue
 	    DHCP=no
 	fi
+
+	CONFIG_NO_SPOOF=$(toggle "$rc" no_spoof "$CONFIG_NO_SPOOF")
+	CONFIG_NO_SOURCE=$(toggle "$rc" no_source "$CONFIG_")
+	CONFIG_PROXY_ARP=$(toggle "$rc" proxy_arp "$CONFIG_")
+	CONFIG_REDIRECT=$(toggle "$rc" redirect "$CONFIG_")
+	CONFIG_ACCEPT_REDIRECTS=$(toggle "$rc" accept_redirect "$CONFIG_")
+	CONFIG_LOG_MARTIANS=$(toggle "$rc" log_martians "$CONFIG_")
 
 	if [ "$rc" = "Add IPv4 address" ]; then
 	    ip=$(addip $ifname)
